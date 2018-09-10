@@ -1,10 +1,22 @@
-#!/usr/local/bin/bash
+#!/bin/bash
 #
 # Input arguments:
 # input - Input is the original FASTQ file.
 # prefix - prefix for all output files. (default: first 8 letters of input file)
 # qs_ath - average quality score threshold. filter out all sequences that have average quality score lower than this. (default: 85)
 # qs_hth - homopolymer quality score threshold.
+
+echo ""
+echo "FASTQ Quality Control to FASTA"
+
+# Get scripts directory; supports symlinks
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
 
 if [[ $# -lt 1 ]]; then
   echo "fastq_qc_to_fasta: need to provide arguments. see -h or --help."
@@ -31,6 +43,18 @@ do
       prefix="$2"
       shift
       ;;
+      --do-quality-filtering) # Do average quality score filtering?
+      j_qfilter="$2"
+      shift
+      ;;
+      --do-homopolymer-run-filtering)
+      j_homo="$2"
+      shift
+      ;;
+      --do-pcr-alignment-filtering)
+      j_primeraln="$2"
+      shift
+      ;;
       -qs_ath|--qs_ath) # Minimum average quality score of read
       qs_ath="$2"
       shift # past argument
@@ -47,17 +71,20 @@ do
       pb_ws="$2"
       shift
       ;;
-      -skip_primer_aln|--skip_primer_aln) # Skip primer alignment step?
-      skip_primer_aln=1
+      -pb_off|--pb_off) # Maximum alignment offest for blast reads vs primers
+      pb_off="$2"
+      shift
+      ;;
+      --del-intermediate-files) # Delete all intermediate files?
+      del_files="$2"
+      shift
+      ;;
+      --del-filtered-reads)
+      del_filtered="$2"
       shift
       ;;
       -h|--help) # Show program usage
-      echo "fastq_qc_to_fasta -i input_fastq -m primers_fa -p output_prefix"
-      echo "Optional arguments"
-      echo "-qs_ath (--qs_ath): average read quality score threshold [default: 85]"
-      echo "-qs_hth (--qs_hth): homopolymer run filter first base minimum quality score [default: 30]"
-      echo "-run_hth (--run_hth): homopolymer run filter minimum length [default: 2]"
-      echo "-pb_ws (--pb_ws): word size for blast_reads_vs_primers [default: 13]"
+      cat $DIR/manuals/fastq_qc_to_fasta.txt | more
       exit
       shift
       ;;
@@ -72,91 +99,136 @@ do
   shift # past argument or value
 done
 
+
 # For any argument not in input set as default values
-if [ -z "$qs_ath" ]; then
-  qs_ath=85
-fi
-if [ -z "$qs_hth" ]; then
-  qs_hth=30
-fi
-if [ -z "$pb_ws" ]; then
-  pb_ws=13
-fi
 if [ -z "$prefix" ]; then
   # Default output prefix is the entire path of the original file
-  # together with the first 8 letters of the original filename.
-  input_fastq_basename=${input_fastq##*/}
-  if [[ "${input_fastq:0:1}" == "/" ]]; then
-    input_fastq_path="${input_fastq:1}"
-    input_fastq_path="${input_fastq_path%/*}"
-    prefix="/${input_fastq_path}/${input_fastq_basename:0:8}"
-  else
-    input_fastq_path="${input_fastq%/*}"
-    prefix="${input_fastq_path}/${input_fastq_basename:0:8}"
+  prefix=${input_fastq%.*}
+  echo "? output prefix not provided. Generated: $prefix"  
+fi
+
+if [ -z "$del_files" ]; then
+  del_files=1
+fi
+if [ -z "$del_filtered" ]; then
+  del_filtered=1
+fi
+
+# Arguments specifying which jobs (processing parts) to execute
+# do all jobs by default unless specified otherwise
+if [ -z "$j_qfilter" ]; then
+  j_qfilter=1
+fi
+if [ -z "$j_homo" ]; then
+  j_homo=1
+fi
+if [ -z "$j_primeraln" ]; then
+  j_primeraln=1
+fi
+
+echo ""
+echo "Jobs to do:"
+echo -n "* average quality score filter: "
+if [ "$j_qfilter" -eq "1" ]; then
+  echo -n "ON "
+  if [ -z "$qs_ath" ]; then
+    qs_ath=85
   fi
-fi
-if [ -z "$run_hth" ]; then
-  run_hth=2
-fi
-if [ -z "$input_primers" ]; then
-  input_primers="primers.fa"
-fi
-if [ -z "$skip_primer_aln" ]; then
-  skip_primer_aln=0
+  echo "(min qscore: $qs_ath)"
+else
+  echo "OFF"
 fi
 
-echo "FASTQ Quality Control to FASTA"
-echo "input_fastq_path: ${input_fastq_path}"
-echo "Prefix for output files (p): $prefix"
-echo "Quality score average filter threshold (qs_ath): $qs_ath"
-echo "Homopolymer filter run quality score threshold (qs_hth): $qs_hth"
-echo "Homopolymer filter run repeat threshold (run_hth): $run_hth"
-echo "Primer blast word size (pb_ws): $pb_ws"
-echo "Skip primer aligment: $skip_primer_aln"
-# exit
+echo -n "* homopolymer run filter: "
+if [ "$j_homo" -eq "1" ]; then
+  echo -n "ON "
+  if [ -z "$qs_hth" ]; then
+    qs_hth=30
+  fi
+  if [ -z "$run_hth" ]; then
+    run_hth=2
+  fi
+  echo "(qscore threshold: $qs_hth, num. repeats: ${run_hth}+)"
+else
+  echo "OFF"
+fi
 
-# Get scripts directory; supports symlinks
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
-done
-DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
+echo -n "* PCR primer alignment filter: "
+if [ "$j_primeraln" -eq "1" ]; then
+  echo -n "ON "
+  if [ -z "$pb_ws" ]; then
+    pb_ws="auto"
+  fi
+  if [ -z "$pb_off" ]; then
+    pb_off=150
+  fi
+  if [ -z "$input_primers" ]; then
+    echo ""
+    echo "! ERROR: PCR primer file not provided."
+    exit 1
+  fi
+  echo "(BLAST word size: $pb_ws)"
+else
+  echo "OFF"
+fi
+
+echo ""
+echo "Executing jobs:"
 
 # Average quality score filter
-out_qc1="${prefix}_filtered_qs${qs_ath}"
-echo -n "* Filtering reads with avearge quality score below ${qs_ath}... "
-$DIR/fastq_qscore_filter_fast "$qs_ath" "$input_fastq" "${out_qc1}.fastq"
-echo "OK."
+if [ "$j_qfilter" -eq "1" ]; then  
+  out_qc1="${prefix}_filtered_qs${qs_ath}"
+  echo -n "* average quality filter... "
+  $DIR/fastq_qscore_filter_fast "$qs_ath" "$input_fastq" "${out_qc1}.fastq"
+  echo "OK."
+else
+  echo "* SKIP: average quality filter"
+  out_qc1="$prefix"
+fi
 
 # Homopolymer run filter
-out_qc2="${out_qc1}_hpf_qs${qs_hth}_rep${run_hth}"
-# echo -n "* Filtering homopolymer runs (len: ${run_hth}+) with first base quality score below ${qs_hth}"
-$DIR/fastq_homopolymer_filter.py "${out_qc1}.fastq" "$qs_hth" "$run_hth"
+if [ "$j_homo" -eq "1" ]; then
+  out_qc2="${out_qc1}_hpf_qs${qs_hth}_rep${run_hth}"
+  echo -n "* homopolymer run filter... "
+  $DIR/fastq_homopolymer_filter.py "${out_qc1}.fastq" "$qs_hth" "$run_hth" \
+    "${out_qc2}.fastq" "${out_qc2}_homopolymer_qs.txt"
+  echo "OK."
+else
+  echo "* SKIP: homopolymer run filter"
+  out_qc2="$out_qc1"
+fi
+
+# # Counting unique reads
+# out_qc3="${out_qc2}_count_unique_reads.txt"
+# echo -n "* counting unique reads... "
+# awk 'NR % 4 == 2 { print $0 }' "${out_qc2}.fastq" | sort | uniq -c > "$out_qc3"
 # echo "OK."
 
-# Counting unique reads
-out_qc3="${out_qc2}_count_unique_reads.txt"
-echo -n "* Finding unique reads after filters... "
-awk 'NR % 4 == 2 { print $0 }' "$out_qc2.fastq" | sort | uniq -c > "$out_qc3"
+# # Generate FASTA file
+# out_qc4="${out_qc2}_unique"
+# echo -n "*"
+# awk '{ printf ">read_%05d;count_%d\n%s\n", NR, $1, $2 }' "$out_qc3" > "${out_qc4}.fasta"
+# echo "OK."
 
-# Generate FASTA file
-out_qc4="${out_qc2}_unique"
-awk '{ printf ">read_%05d;count_%d\n%s\n", NR, $1, $2 }' "$out_qc3" > "${out_qc4}.fa"
-echo "OK."
+# Find unique reads in FASTQ and convert to FASTA
+out_qc3="${out_qc2}_unique"
+$DIR/fastq_unique_to_fasta "${out_qc2}.fastq" "${out_qc3}.fasta"
 
 # BLAST reads vs primers, find uniques again
-if [ "$skip_primer_aln" -eq "0" ]; then
-  out_qc5="${out_qc4}_primerblasted_ws${pb_ws}"
-  $DIR/blast_reads_vs_primers "$input_primers" "${out_qc4}.fa" "${out_qc5}.fa" "${out_qc5}_filtered.fa"
+if [ "$j_primeraln" -eq "1" ]; then
+  echo "* PCR primer alignment filter..."
+  out_qc5="${out_qc3}_primerblasted_ws${pb_ws}"
+  $DIR/blast_reads_vs_primers "$input_primers" "${out_qc3}.fasta" \
+    "${out_qc5}.fasta" "${out_qc5}_filtered.fasta" \
+    "$pb_off" "pb_ws"
 else
+  echo "* SKIP: BLAST reads vs PCR primers"
   out_qc5="${out_qc4}"
 fi
 
 
 # Find uniques now with reverse complements:
-echo "* Finding unique reads with rev. comp. (adding up counts)"
+echo -n "* finding unique reads (adding up counts)... "
 awk '
    BEGIN { c = 0 }
    {
@@ -180,5 +252,27 @@ awk '
        j++
      }
    }
- ' "${out_qc5}.fa" > "${out_qc5}_unique.fa"
+ ' "${out_qc5}.fasta" > "${out_qc5}_unique.fasta"
 echo "OK."
+
+# Delete intermediate files?
+if [ "$del_files" -eq "1" ]; then
+  echo -n "* deleting temporary files"
+  rm "${out_qc1}.fastq"
+  echo -n "."
+  rm "${out_qc2}.fastq"
+  echo -n "."
+  rm "${out_qc2}_homopolymer_qs.txt"
+  echo -n "."
+  rm "${out_qc3}.fasta"
+  echo -n "."
+  rm "${out_qc5}.fasta"
+  echo -n "."
+  if [ "$del_filtered" -eq "1" ]; then
+    rm "${out_qc5}_filtered.fasta"
+    echo -n "."
+  fi
+  echo " OK."
+fi
+
+echo ""

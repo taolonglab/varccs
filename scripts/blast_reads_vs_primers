@@ -1,0 +1,238 @@
+#!/bin/bash
+#
+# Blast primers vs reads
+# Blast PCR primers vs PacBio ccs reads, filter out any read that
+# is not flanked with forward/reverse primers.
+# For reads with reverse/complementary orientation, reverse them back
+# to 5'-3' direction.
+#
+# Input 1. FASTA file with forward and reverse primers
+#          in 5' to 3' direction with meta-data:
+#          >forward_5to3, >forward_3to5, >reverse_5to3 and >reverse_3to5
+#       2. ccs or fasta file with reads
+#       3. Output file FA
+#       4. Output file for reads that didn't make it pass the filter
+#
+#
+
+# Timer when we started to calculate execution time
+start=`date +%s`
+
+# Blast parameters
+gapopen=0
+gapextend=2
+
+# Allowed alignment offset
+# Require primers to align at the first 3 or last places
+# If they are deeper in the read, skip these.
+#aln_offset=150
+
+read_filter_file="$4"
+aln_offset="$5"
+word_size="$6"
+
+
+# echo "Blastn reads vs PCR primers"
+# echo "---------------------------"
+# echo "CCS file with reads: $2"
+# echo "Output FASTA: $3"
+
+primer=""
+for5to3=""
+for3to5=""
+rev5to3=""
+rev3to5=""
+
+while IFS= read -r primers_fa
+do
+  case ${primers_fa:0:13} in
+    ">forward_5to3")
+      primer="f53" ;;
+    ">forward_3to5")
+      primer="f35" ;;
+    ">reverse_5to3")
+      primer="r53" ;;
+    ">reverse_3to5")
+      primer="r35" ;;
+    *)
+      case $primer in
+        "f53")
+          for5to3="$primers_fa" ;;
+        "f35")
+          for3to5="$primers_fa" ;;
+        "r53")
+          rev5to3="$primers_fa" ;;
+        "r35")
+          rev3to5="$primers_fa" ;;
+      esac
+      ;;
+  esac
+done < $1
+
+if [[ $for5to3 == "" ]]; then
+  echo "! ERROR: Forward 5' to 3' primer (>forward_5to3) not found."
+  exit 1
+fi
+if [[ $for3to5 == "" ]]; then
+  echo "! ERROR: Forward 3' to 5' primer (>forward_3to5) not found."
+  exit 1
+fi
+if [[ $rev5to3 == "" ]]; then
+  echo "! ERROR: Reverse 5' to 3' primer (>reverse_5to3) not found."
+  exit 1
+fi
+if [[ $rev3to5 == "" ]]; then
+  echo "! ERROR: Reverse 3' to 5' primer (>reverse_3to5) not found."
+  exit 1
+fi
+
+# Load primers
+# echo "Forward primer (5' -> 3'): $for5to3 (len: ${#for5to3})"
+# echo "Reverse primer (5' -> 3'): $rev5to3 (len: ${#rev5to3})"
+
+# Calculate word size based on 3/4 of the length of the shortest primer
+if [[ $word_size -eq "auto" ]]; then
+  echo "  ? word size automatically set to 3/4 of the shortest primer length."
+  word_size=$(( ${#for5to3} < ${#rev5to3} ? 3*${#for5to3}/4 : 3*${#rev5to3}/4 ))
+fi
+# word_size=11
+# echo "Word size for blast (0.75 * shortest primer len): $word_size"
+# echo "Gap open penalty: $gapopen"
+# echo "Gap extension penalty: $gapextend"
+# echo "Allowed alignment offset: $aln_offset"
+# echo -en "\n"
+echo "  - BLAST word size: $word_size, gap open: $gapopen, gap extend: $gapextend, max offset: $aln_offset"
+
+
+# Open output file for writing
+> $3
+> $read_filter_file
+
+i=1
+line_no=-1
+seq=""
+meta=""
+reads_skipped=0
+reads_missing_both_primers=0
+reads_wrong_dir=0
+reads_swapped=0
+
+first_line=$(head -n 1 $2)
+# First line in the file, figure out whether it's fastq or fasta
+if [[ ${first_line:0:1} == ">" ]]; then
+  # It's fasta
+  block_size=2
+  meta_symbol=">"
+  file_format="FASTA"
+elif [[ ${first_line:0:1} == "@" ]]; then
+  # It's fastq
+  block_size=4
+  meta_symbol="@"
+  file_format="FASTQ"
+else
+  # It's a werid file, throw error.
+  echo "! ERROR: Unknown file type for reads. The first character should be either > or @."
+  exit 1
+fi
+
+# For progress bar first find the total number of read sequences
+total_reads=$(grep -c "^$meta_symbol" $2)
+echo "  - total reads in the read file: $total_reads. file format: $file_format"
+
+while IFS= read -r read_line
+do
+  line_no=$(( (line_no + 1) % block_size ))
+  case $line_no in
+    0)
+      # Meta-data line
+      meta="$read_line"
+      ;;
+    1)
+      # Update progress bar
+      printf "\r  - processed % 5d out of % 5d reads (skipped: % 4d, % 4d missing > 1 primer, % 4d rev. complemented, % 1d wrong dir)." $((i-1)) $total_reads $reads_skipped $reads_missing_both_primers $reads_swapped $reads_wrong_dir
+      i=$(( i+1 ))
+
+      # DNA sequence line
+      seq="$read_line"
+      seq_len_off=${#seq}
+      seq_len_off=$((seq_len_off - aln_offset))
+      # We already have meta-data saved from previous line so we
+      # can run blast here
+      # echo -e "test:\n\n>${meta:1}\n$seq"
+      fa=$(echo -e ">${meta:1}\n$seq")
+      blast_out=$(blastn -subject <(echo -e "$fa") -dust no -word_size "$word_size" -gapopen "$gapopen" -gapextend "$gapextend" -strand plus -outfmt 6 -query "$1")
+
+      # Check no of hits in the blast.
+      blast_no_hits=0
+      for_hit_ok=false
+      rev_hit_ok=false
+      for_dir=""
+      rev_dir=""
+
+      while IFS= read -r blast_line
+      do
+        blast_no_hits=$(( blast_no_hits + 1 ))
+        IFS=$'\t' read -r -a blast_line_a <<< "$blast_line"
+        # echo "Blast line items: ${blast_line[0],${blast_line[1]}}"
+        # Check forward and reverse primer hits
+        IFS=$'_' read -r -a primer_data <<< "${blast_line_a[0]}"
+        # echo "Primer data: ${primer_data[0]}, ${primer_data[1]}"
+        # ${primer_data[0]} is either 'forward' or 'reverse'
+        # ${primer_data[1]} is either '5to3' or '3to5'
+        case ${primer_data[0]} in
+          "forward")
+            # Is the hit at the beginning or the end of the read?
+            if [[ ${blast_line_a[8]} -lt $aln_offset || ${blast_line_a[9]} -gt $seq_len_off ]]; then
+              for_hit_ok=true
+              for_dir=$( if [[ ${primer_data[1]} == "5to3" ]]; then echo "5to3"; else echo "3to5"; fi )
+            fi
+            ;;
+          "reverse")
+            # Is the hit at the beginning or the end of the read?
+            if [[ ${blast_line_a[8]} -lt $aln_offset || ${blast_line_a[9]} -gt $seq_len_off ]]; then
+              rev_hit_ok=true
+              rev_dir=$( if [[ ${primer_data[1]} == "5to3" ]]; then echo "5to3"; else echo "3to5"; fi )
+            fi
+            ;;
+        esac
+      done <<< "$blast_out"
+
+      # If we don't have a valid hit for both reverse and forward primers, skip this read
+      if [ "$for_hit_ok" = false ] || [ "$rev_hit_ok" = false ]; then
+        reads_skipped=$((reads_skipped + 1))
+        reads_missing_both_primers=$((reads_missing_both_primers + 1))
+        echo -e "$meta\n$seq" >> $read_filter_file
+        continue
+      else
+        # Now check if both primers are in the same direction, that is they should both be
+        # either 5' -> 3' or 3' -> 5'
+        if [[ $for_dir != $rev_dir ]]; then
+          reads_skipped=$((reads_skipped + 1))
+          reads_wrong_dir=$((reads_wrong_dir + 1))
+        fi
+      fi
+
+      # Otherwise save this read as a fasta
+      # If the direction is "3to5" for both $for_dir and $rev_dir then reverse complement the seq
+      if [[ $for_dir == "3to5" && $rev_dir == "3to5" ]]; then
+        seq=$(echo $seq | tr "[ACGTacgt]" "[TGCAtgca]" | rev | sed 's/N\(.\)/\1n/g')
+        # The last sed swaps NA -> AN where N is used a homopolymer run substitution letter
+        echo -e ">${meta:1};rc\n$seq" >> $3
+        reads_swapped=$((reads_swapped + 1))
+      else
+        echo -e "$fa" >> $3
+      fi
+      ;;
+  esac
+done < $2
+
+# Cleanup and final output
+# rm tmp.fa
+# echo -e "\nDone."
+end=`date +%s`
+runtime=$((end-start))
+rtmin=$((runtime / 60))
+rtsec=$((runtime % 60))
+echo ""
+echo "  - total run time: $rtmin m $rtsec s"
+echo "  OK."

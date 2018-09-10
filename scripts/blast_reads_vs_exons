@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# blast exons vs reads
+#
+# Align exon sequences to PacBio reads using 'blastn' and save output as a tab-delimited
+# table.
+#
+# Input 1. FASTA file with reads, e.g. reads/job-7871-head1.fa
+#       2. FASTA file with exons (or genomic regions), e.g. fa/app_exons_cds_clean_rc.fa
+#       3. Output table file
+#       Optional:
+#				4. word_size for blast (we set default to 25)
+#				5. gap opening penalty: (default 0)
+#				6. gap extension penalty (default 2)
+
+# Timer when we started to calculate execution time
+start=`date +%s`
+
+echo "Blastn exons vs reads"
+echo "---------------------"
+echo "reads: $1"
+echo "exons: $2"
+if [ -z "$4" ]; then
+	word_size="25"
+else
+	word_size="$4"
+fi
+echo "word_size: $word_size"
+
+if [ -z "$5" ]; then
+	gapopen="0"
+else
+	gapopen="$5"
+fi
+echo "gap opening penalty: $gapopen"
+
+if [ -z "$6" ]; then
+	gapextend="2"
+else
+	gapextend="$6"
+fi
+echo "gap extension penalty: $gapextend"
+outfmt="qseqid sseqid length mismatch gapopen qstart qend sstart send qseq sseq"
+
+
+# For progress bar first find the total number of read sequences
+total_reads=$(grep -c "^>" $1)
+echo "total reads: $total_reads"
+# echo -en "\n"
+
+# Start new output file
+> $3
+echo -e "exon_id\tread_id\talignment_length\tno_mismatches\tno_gap_openings\texon_start_pos_align\texon_end_pos_align\tread_start_pos_align\tread_end_pos_align\texon_seq\tread_seq" >> $3
+i=1
+
+function join_by { local IFS="$1"; shift; echo "$*"; }
+
+while IFS= read -r fasta_line
+do
+  # If the line is metadata just extract the ncbi id and move on
+	if [[ ${fasta_line:0:1} == ">" ]]; then
+		current=$(echo ${fasta_line:1})
+		continue
+	fi
+
+  # Extract a single sequence from the read into tmp.fa then blast that
+  > tmp.txt
+	echo ">"$current > tmp.fa
+	echo $fasta_line >> tmp.fa
+
+  # Run BLAST
+  blast_out=$(blastn -subject tmp.fa -dust no -word_size "$word_size" -gapopen "$gapopen" -gapextend "$gapextend" -strand plus -outfmt "6 $outfmt" -query "$2" -lcase_masking)
+
+	# Find the locations of lowercase n, and correct the bugged
+	# BLAST output (let's leave lcase_masking just in case it ever gets fixed)
+	# read -a blast_a <<< "$blast_out"
+	# blast_qseq="${blast_a[9]}"
+	# blast_a[9]=$(scripts/blast_lowercase_fix.py "$fasta_line" "$blast_qseq")
+
+	# blast_out="${blast_a[*]}"
+
+	# Extract both lowercase and uppercase Ns
+	# Replace each i-th N that is lowercase in extracted string
+
+
+	# Write output
+  echo "$blast_out" | tr " " "\t" >> $3
+
+	# Update progress bar
+  printf "\rProcessed % 5d out of % 5d reads." $i $total_reads
+  i=$((i+1))
+done < $1
+rm tmp.fa
+echo -e "\nDone."
+end=`date +%s`
+runtime=$((end-start))
+rtmin=$((runtime / 60))
+rtsec=$((runtime % 60))
+echo "Total run time: $rtmin m $rtsec s."

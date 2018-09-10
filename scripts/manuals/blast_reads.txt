@@ -1,0 +1,19 @@
+BLAST Quality Controlled reads to Reference Exons
+
+Usage:
+
+blast_reads
+	-i input.fasta
+	-e exons.fasta
+	-o output_prefix
+	[options]
+
+Mandatory arguments:
+
+	-i input.fasta or --input input.fasta
+		input.fasta is the FASTA file obtained from the fastq_qc_to_fasta step.
+
+	-e exons.fasta or --exons exons.fasta
+		exons.fasta is the FASTA file with reference exon sequence.
+
+The following [options] are available:

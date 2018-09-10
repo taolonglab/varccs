@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Find unique sequences
+input="$1"
+output="$2"
+awk '
+NR % 4 == 2 {
+  if ($0 in seq) {
+    seq[$0] += 1
+  }
+  else {
+    seq[$0] = 1
+  }
+}
+END {
+  j = 0
+  PROCINFO["sorted_in"] = "@val_num_desc"
+  for (i in seq) {
+    printf ">read_%05d;count_%d\n%s\n",j,seq[i],i;
+    j++
+  }
+}
+' "$input" > "$output"

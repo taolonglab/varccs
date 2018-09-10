@@ -1,0 +1,147 @@
+#!/bin/bash
+#
+# Input 1. FASTA reads/*_wsXX_uniques.fa
+#       2. FASTA file with exons, i.e. fa/app_exons_cds_clean_rc.fa
+#       3. Word size for primer blast
+#       4. Gap opening penalty
+#       5. Gap extension penalty
+
+echo ""
+echo "BLAST Quality Controlled reads to Reference Exons"
+
+
+# Get scripts directory; supports symlinks
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
+
+if [[ $# -lt 1 ]]; then
+  echo "blast_reads: need to provide arguments. see -h or --help."
+  exit
+fi
+if [[ $# -lt 2 && "$1" != "-h" && "$1" != "--help" ]]; then
+  echo "blast_reads: need to provide arguments. see -h or --help."
+  exit
+fi
+
+while [[ $# -gt 1 || "$1" == "-h" || "$1" == "--help" ]]
+do
+  key="$1"
+  case $key in
+      -i|--input) # Input FASTA file with processed / qc'ed reads
+      input_file="$2"
+      shift # past argument
+      ;;
+      -e|--exons) # Input FASTA file with exon sequences we are blasting against
+      input_exons="$2"
+      shift
+      ;;
+      -ws|--word_size) # Word size for blast reads vs exons
+      word_size="$2"
+      shift # past argument
+      ;;
+      -go|--gap_open) # Gap opening penalty
+      go="$2"
+      shift
+      ;;
+      -ge|--gap_extend) # Gap extension penalty
+      ge="$2"
+      shift
+      ;;
+      -out|--output_folder) # Output folder for blast results
+      out="$2"
+      shift
+      ;;
+      -readlen) # Force generating read lengths
+      readlen="$2"
+      shift
+      ;;
+      -skip) # Skip to plots
+      skip="$2"
+      shift
+      ;;
+      -h|--help) # Show program usage
+      echo "blast_reads -i input_fasta -e input_exons_fasta"
+      echo "Optional arguments"
+      echo "-out (--output_folder): output folder for blast [default: data/]"
+      echo "-ws (--word_size): word size for blast reads vs exons [default: 25]"
+      echo "-go (--gap_open): gap opening penalty for blast reads vs exons [default: 0]"
+      echo "-ge (--gap_extend): gap extension penalty for blast reads vs exons [default: 2]"
+      exit
+      shift
+      ;;
+      --default)
+      DEFAULT=YES
+      ;;
+      *)
+      echo "blast_reads: unknown argument $key"
+      # unknown option
+      ;;
+  esac
+  shift # past argument or value
+done
+
+# For any argument not in input set as default values
+if [ -z "${word_size}" ]; then
+  word_size=25
+fi
+if [ -z "$go" ]; then
+  go=0
+fi
+if [ -z "$ge" ]; then
+  ge=2
+fi
+if [ -z "$input_exons" ]; then
+  input_exons="fa/app_exons_cds_clean_rc.fa"
+fi
+if [ -z "$out" ]; then
+  out="data/"
+fi
+if [ -z "$skip" ]; then
+  skip=0
+fi
+if [ -z "$readlen" ]; then
+  readlen=0
+fi
+
+input_blast_base="${input_file%%.*}"
+input_blast_base="${input_blast_base##*/}"
+
+out_lentab="$out${input_blast_base}_length_table.txt"
+out_blast="${out}${input_blast_base}_blast_results_ws${word_size}_go${go}_gx${ge}.txt"
+
+# echo "Input file: $input_file"
+# echo "Input blast base: $input_blast_base"
+# echo "Output length file: $out_lentab"
+# echo "Output blast results file: $out_blast"
+# echo "Skip: $skip"
+
+if [[ "$skip" == "0" || "$readlen" == "1" ]]; then
+  echo -n "* calculating read lengths... "
+  awk '
+  BEGIN {
+    print "read_id\tread_length"
+  }
+  {
+    if (NR % 2 == 0) {
+      printf "%d\n", length($0)
+    } else {
+      match($0, /^>(.*);/);
+      printf "%s\t", substr($0, RSTART+1, RLENGTH-2)
+    }
+  }' $input_file > $out_lentab
+  echo "OK."
+
+  # Blast reads vs exons
+  # Swap reads with data
+  $DIR/blast_reads_vs_exons $input_file $input_exons $out_blast $word_size $go $ge
+fi
+
+# Generate plots
+Rscript ${app_path}r/blast_results_plots.R -i $out_blast -r $out_lentab || true
+
+# Generate more plots

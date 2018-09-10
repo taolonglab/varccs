@@ -1,34 +1,31 @@
-#!/bin/bash
+#!/usr/local/bin/bash
 #
 # Faster fastq qscore filter
 
 awk -v qs_th="$1" '
   BEGIN {
     for (n=0; n<256; n++) {
-      ascii[sprintf("%c", n)] = n
+      ascii[sprintf("%c", n)] = n;
     }
   }
   {
-    switch(NR % 4) {
-    case 1:
-      meta = $0
-      next
-    case 2:
-      seq = $0
-      next
-    case 0:
-      # Calculate average quality score
-      qs_avg = 0
+    if (NR % 4 == 1) {
+      meta = $0;
+    }
+    else if (NR % 4 == 2) {
+      seq = $0;
+    }
+    else {
+      qs_avg = 0;
       for (i=1; i<=length($0); i++) {
-        qs_avg += ascii[substr($0,i,1)]-33
-        # ss += (ascii[substr($0,i,1)]-33)^2
+        qs_avg += ascii[substr($0,i,1)]-33;
       }
       # print "Average: "qs_avg
-      qs_avg = qs_avg/length($0)
+      qs_avg = qs_avg/length($0);
       if (qs_avg > qs_th) {
-        printf "%s\n%s\n+\n%s\n", meta, seq, $0
-        next
+        printf "%s\n%s\n+\n%s\n", meta, seq, $0;
       }
+
     }
   }
 ' $2 > $3
