@@ -55,7 +55,11 @@ scripts/snvs_indels_analysis \
 
 
 # Circo plot 1
-
+scripts/snvs_indels_plot \
+    -i examples/analysis/ex1_exon_table_hmpfix.txt \
+    -e examples/ex1-app-exons.fasta \
+    -s examples/analysis/ex1_snvs_indels.txt \
+    -o examples/analysis/ex1_snvs_indels_circo.pdf
 
 
 ```

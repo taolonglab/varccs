@@ -19,8 +19,6 @@ suppressPackageStartupMessages(library(optparse))
 annotation = c('insertion', 'deletion', 'SNV', '-')
 nts = c('A', 'C', 'G', 'T', '-')
 
-
-
 #------------------------------- Parse user arguments -----------------------------
 
 option_list = list(
