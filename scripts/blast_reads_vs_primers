@@ -101,7 +101,7 @@ fi
 # echo "Gap extension penalty: $gapextend"
 # echo "Allowed alignment offset: $aln_offset"
 # echo -en "\n"
-echo "  - BLAST word size: $word_size, gap open: $gapopen, gap extend: $gapextend, max offset: $aln_offset"
+echo "  - BLAST word size: $word_size, gap open: $gapopen, gap extend: $gapextend, max offset: $aln_offset nt"
 
 
 # Open output file for writing

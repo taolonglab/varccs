@@ -1,0 +1,3 @@
+exon_no	exon_abs_pos	type	mut_new	Clinical Phenotype	Primary  Papers	read_id	read_count	exon_comb_short_rc
+17	2144	SNV	C	Alzheimer's Disease	Cruts et al., 2003	read_00010	1	1-5,16-18
+17	2149	SNV	T	Alzheimer's Disease	Murrell et al., 1991	read_00058	1	1-3,16-18

@@ -16,37 +16,41 @@
 # Timer when we started to calculate execution time
 start=`date +%s`
 
-echo "Blastn exons vs reads"
-echo "---------------------"
-echo "reads: $1"
-echo "exons: $2"
+# echo "Blastn exons vs reads"
+# echo "---------------------"
+# echo "reads: $1"
+# echo "exons: $2"
 if [ -z "$4" ]; then
 	word_size="25"
 else
 	word_size="$4"
 fi
-echo "word_size: $word_size"
+# echo "word_size: $word_size"
 
 if [ -z "$5" ]; then
 	gapopen="0"
 else
 	gapopen="$5"
 fi
-echo "gap opening penalty: $gapopen"
+# echo "gap opening penalty: $gapopen"
 
 if [ -z "$6" ]; then
 	gapextend="2"
 else
 	gapextend="$6"
 fi
-echo "gap extension penalty: $gapextend"
+# echo "gap extension penalty: $gapextend"
 outfmt="qseqid sseqid length mismatch gapopen qstart qend sstart send qseq sseq"
 
 
 # For progress bar first find the total number of read sequences
 total_reads=$(grep -c "^>" $1)
-echo "total reads: $total_reads"
+# echo "total reads: $total_reads"
 # echo -en "\n"
+
+echo "* blast reads vs ref. exons"
+echo "  - word size: $word_size, gap open: $gapopen, gap extend: $gapextend"
+
 
 # Start new output file
 > $3
@@ -87,13 +91,16 @@ do
   echo "$blast_out" | tr " " "\t" >> $3
 
 	# Update progress bar
-  printf "\rProcessed % 5d out of % 5d reads." $i $total_reads
+  printf "\r  - processed % 5d out of % 5d reads" $i $total_reads
   i=$((i+1))
 done < $1
 rm tmp.fa
-echo -e "\nDone."
+rm tmp.txt
+# echo -e "\n  OK."
 end=`date +%s`
 runtime=$((end-start))
 rtmin=$((runtime / 60))
 rtsec=$((runtime % 60))
-echo "Total run time: $rtmin m $rtsec s."
+echo ""
+echo "  - total run time: $rtmin m $rtsec s"
+# echo "  OK."

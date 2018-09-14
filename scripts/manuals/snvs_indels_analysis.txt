@@ -1,0 +1,42 @@
+Analysis of SNVs and indels
+
+Description:
+
+	Analyze detected exon combination variants for SNVs and indels
+	absent in the reference exon sequences. 
+
+Usage:
+
+	snvs_indels_analysis
+		-i exon_table.txt
+	    -e reference-exons.fasta
+	    -os snvs_indels.txt
+	    [options]
+
+Mandatory arguments:
+
+	-i exon_table.txt | --input-blast exon_table.txt
+		exon_table.txt is the output table from the `blast_reads` script and
+		contains matches of reference exons to reads
+
+	-e reference-exons.fasta | --input-exons-fasta reference-exons.fasta
+		reference-exons.fasta is the FASTA file with reference exon sequences
+
+	-os snvs_indels.txt | --output-snvs-indels snvs_indels.txt
+
+
+The following [options] are available:
+
+	-f reference-fads.txt | --input-fads reference-fads.txt
+		reference-fads.txt is a manually prepared tab-delimited table of
+		Familial AD mutations, based on the Alzforum data.
+
+	-of fads.txt | --output-fads fads.txt
+		A table with a list of matching SNVs/indels to any from the 
+		reference-fads.txt. This is a mandatory argument when -f or
+		--input-fads is given.
+
+	--del-intermediate-files 0,1
+		0 = do NOT delete intermediate files used in each step, useful for debugging
+		1 = do delete intermediate files
+		Default: 1

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Generate the tab-delim length table from the reference exon
+# FASTA file.
+
+awk '
+BEGIN {
+	print "exon_id\texon_length";
+}
+{
+	if ($0 ~ /^>/) {
+		match($0, /^>exon_[0-9]+(_rc)?/);
+		printf "%s\t", substr($0, RSTART+1, RLENGTH);
+	} else {
+		print length($0)
+	}
+}' $1 > $2

@@ -8,14 +8,14 @@
 
 echo ""
 echo "BLAST Quality Controlled reads to Reference Exons"
-
+echo ""
 
 # Get scripts directory; supports symlinks
 SOURCE="${BASH_SOURCE[0]}"
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
   DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
   SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" 
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
 
@@ -40,37 +40,32 @@ do
       input_exons="$2"
       shift
       ;;
-      -ws|--word_size) # Word size for blast reads vs exons
+      -ws|--word-size) # Word size for blast reads vs exons
       word_size="$2"
       shift # past argument
       ;;
-      -go|--gap_open) # Gap opening penalty
+      -go|--gap-open) # Gap opening penalty
       go="$2"
       shift
       ;;
-      -ge|--gap_extend) # Gap extension penalty
+      -ge|--gap-extend) # Gap extension penalty
       ge="$2"
       shift
       ;;
-      -out|--output_folder) # Output folder for blast results
+      -p|--prefix) # Prefix for output files
       out="$2"
       shift
       ;;
-      -readlen) # Force generating read lengths
-      readlen="$2"
+      --fix-lowq-homopolymer-runs) # Fix low q homopolymer runs
+      hmpfix="$2"
       shift
       ;;
-      -skip) # Skip to plots
-      skip="$2"
+      --del-intermediate-files) # Delete all intermediate files?
+      del_files="$2"
       shift
       ;;
       -h|--help) # Show program usage
-      echo "blast_reads -i input_fasta -e input_exons_fasta"
-      echo "Optional arguments"
-      echo "-out (--output_folder): output folder for blast [default: data/]"
-      echo "-ws (--word_size): word size for blast reads vs exons [default: 25]"
-      echo "-go (--gap_open): gap opening penalty for blast reads vs exons [default: 0]"
-      echo "-ge (--gap_extend): gap extension penalty for blast reads vs exons [default: 2]"
+      cat $DIR/manuals/blast_reads.txt | more
       exit
       shift
       ;;
@@ -95,24 +90,31 @@ fi
 if [ -z "$ge" ]; then
   ge=2
 fi
-if [ -z "$input_exons" ]; then
-  input_exons="fa/app_exons_cds_clean_rc.fa"
-fi
-if [ -z "$out" ]; then
-  out="data/"
-fi
-if [ -z "$skip" ]; then
-  skip=0
-fi
-if [ -z "$readlen" ]; then
-  readlen=0
+
+if [ -z "$del_files" ]; then
+  del_files=1
 fi
 
-input_blast_base="${input_file%%.*}"
-input_blast_base="${input_blast_base##*/}"
+if [ -z "$hmpfix" ]; then
+  hmpfix=1
+fi
 
-out_lentab="$out${input_blast_base}_length_table.txt"
-out_blast="${out}${input_blast_base}_blast_results_ws${word_size}_go${go}_gx${ge}.txt"
+# input_blast_base="${input_file%%.*}"
+# input_blast_base="${input_blast_base##*/}"
+
+
+if [ -z $out ]; then
+  prefix="${input_file%.*}"
+else
+  prefix=$out
+fi
+
+out_blast="${prefix}_blast_results_ws${word_size}_go${go}_gx${ge}.txt"
+out_lentab="${prefix}_read_length_table.txt"
+out_exonlengths="${prefix}_exon_lengths.txt"
+out_exontable="${prefix}_exon_table.txt"
+out_exonsum="${prefix}_exon_combinations_summary.txt"
+
 
 # echo "Input file: $input_file"
 # echo "Input blast base: $input_blast_base"
@@ -120,28 +122,73 @@ out_blast="${out}${input_blast_base}_blast_results_ws${word_size}_go${go}_gx${ge
 # echo "Output blast results file: $out_blast"
 # echo "Skip: $skip"
 
-if [[ "$skip" == "0" || "$readlen" == "1" ]]; then
-  echo -n "* calculating read lengths... "
-  awk '
-  BEGIN {
-    print "read_id\tread_length"
+# if [[ "$skip" == "0" || "$readlen" == "1" ]]; then
+echo -n "* calculating read lengths... "
+awk '
+BEGIN {
+  print "read_id\tread_length"
+}
+{
+  if (NR % 2 == 0) {
+    printf "%d\n", length($0)
+  } else {
+    match($0, /^>(.*);/);
+    printf "%s\t", substr($0, RSTART+1, RLENGTH-2)
   }
+}' $input_file > $out_lentab
+echo "OK."
+
+# Blast reads vs exons
+# Swap reads with data
+$DIR/blast_reads_vs_exons $input_file $input_exons $out_blast $word_size $go $ge
+# fi
+
+# Generate length table
+echo -n "* calculating reference exon lengths... "
+awk '
+  BEGIN { print "exon_id\texon_length" }
   {
     if (NR % 2 == 0) {
       printf "%d\n", length($0)
     } else {
-      match($0, /^>(.*);/);
+      match($0, /^>([^ ]+) /);
       printf "%s\t", substr($0, RSTART+1, RLENGTH-2)
     }
-  }' $input_file > $out_lentab
-  echo "OK."
+  }
+' $input_exons > $out_exonlengths
+echo "OK."
 
-  # Blast reads vs exons
-  # Swap reads with data
-  $DIR/blast_reads_vs_exons $input_file $input_exons $out_blast $word_size $go $ge
+# Generate exon summaries
+Rscript $DIR/blast_results_to_exon_table.R \
+  --input $out_blast --read_lengths $out_lentab \
+  --exon_lengths $out_exonlengths \
+  --output $out_exontable --output_sum $out_exonsum || true
+
+# Generate output filenams for homopolymer fixing script
+out_fasta="${input_file%.*}_hmpfix.fasta"
+out_table="${out_exontable%.*}_hmpfix.txt"
+
+if [ "$hmpfix" -eq "1" ]; then
+  Rscript $DIR/fasta_homopolymer_fix.R \
+    --input-fasta $input_file --input $out_exontable \
+    --output-table $out_table --output-fasta $out_fasta
 fi
 
-# Generate plots
-Rscript ${app_path}r/blast_results_plots.R -i $out_blast -r $out_lentab || true
+if [ "$del_files" -eq "1" ]; then
+  echo -n "* deleting temporary files"
+  if [ -f $out_blast ]; then rm $out_blast; fi
+  echo -n "."
+  if [ -f $out_lentab ]; then rm $out_lentab; fi
+  echo -n "."
+  if [ -f $out_exonlengths ]; then rm $out_exonlengths; fi
+  echo -n "."
+  if [ -f $input_file ]; then rm $input_file; fi
+  echo -n "."
+  if [ -f $out_exontable ]; then rm $out_exontable; fi
+  echo -n "."
+  echo " OK."
+fi
 
-# Generate more plots
+echo ""
+echo "Done."
+echo ""

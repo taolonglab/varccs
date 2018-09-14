@@ -1,0 +1,108 @@
+#!/bin/bash
+#
+# Find and analyze SNVs and indels.
+
+echo ""
+echo "SNVs and indels analysis"
+echo ""
+
+# Get scripts directory; supports symlinks
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" 
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
+
+
+if [[ $# -lt 1 ]]; then
+  echo "snvs_indels_analysis: need to provide arguments. see -h or --help."
+  exit
+fi
+if [[ $# -lt 2 && "$1" != "-h" && "$1" != "--help" ]]; then
+  echo "snvs_indels_analysis: need to provide arguments. see -h or --help."
+  exit
+fi
+
+
+while [[ $# -gt 1 || "$1" == "-h" || "$1" == "--help" ]]
+do
+  key="$1"
+  case $key in
+    -i|--input-blast) # Input FASTA file with processed / qc'ed reads
+    input_blast_table="$2"
+    shift # past argument
+    ;;
+    -e|--input-exons-fasta) 
+    input_exons_fasta="$2"
+    shift
+    ;;
+    -f|--input-fads) 
+    input_fads="$2"
+    shift
+    ;;
+    -of|--output-fads)
+	  output_fads="$2"
+	  shift
+	  ;;
+	  -os|--output-snvs-indels)
+	  output_snvs_indels="$2"
+	  shift
+	  ;;
+    --del-intermediate-files) # Delete all intermediate files?
+    del_files="$2"
+    shift
+    ;;
+    -h|--help) # Show program usage
+    cat $DIR/manuals/snvs_indels_analysis.txt | more
+    exit
+    shift
+    ;;
+    --default)
+    DEFAULT=YES
+    ;;
+    *)
+    echo "blast_reads: unknown argument $key"
+    # unknown option
+    ;;
+  esac
+  shift # past argument or value
+done
+
+if [ -z "$input_fads" ]; then
+	input_fads=" "
+else
+  input_fads="--input-fads ${input_fads}"
+fi
+
+if [ -z "$output_fads" ]; then
+	output_fads=" "
+else
+  output_fads="--output-fads $output_fads"
+fi
+
+if [ -z "$del_files" ]; then
+  del_files=1
+fi
+
+echo -n "* Generating exon lengths..."
+output_exon_lengths="${input_exons_fasta%.*}_exon_lengths.txt"
+$DIR/generate_exon_lengths $input_exons_fasta $output_exon_lengths
+echo " OK."
+
+Rscript --vanilla $DIR/run_snvs_indels_analysis.R \
+    --input-exon-table $input_blast_table \
+    --input-exon-lengths $output_exon_lengths \
+    $input_fads \
+    --output-snvs-indels $output_snvs_indels \
+    $output_fads
+
+if [[ "$del_files" -eq "1" ]]; then
+  echo -n "* Deleting temporary files..."
+  rm $output_exon_lengths
+  echo " OK."
+fi
+
+echo ""
+echo "Done."
