@@ -40,25 +40,17 @@ Rscript scripts/exon_joins.R \
     -i examples/analysis/ex1_exon_table_hmpfix.txt \
     -o examples/analysis/ex1_exon-exon_joins.txt
 
-# SNVs/indels analysis with or without FADS
-scripts/snvs_indels_analysis \
-    -i examples/analysis/ex1_exon_table_hmpfix.txt \
-    -e examples/ex1-app-exons.fasta \
-    -f examples/ex1-app-fads.txt \
-    -os examples/analysis/ex1_snvs_indels.txt \
-    -of examples/analysis/ex1_fads.txt
-#--
 scripts/snvs_indels_analysis \
     -i examples/analysis/ex1_exon_table_hmpfix.txt \
     -e examples/ex1-app-exons.fasta \
     -os examples/analysis/ex1_snvs_indels.txt \
 
-
-# Circo plot 1
+# Circo plot 1: SNVs, indels and intra-exon joins
 scripts/snvs_indels_plot \
     -i examples/analysis/ex1_exon_table_hmpfix.txt \
     -e examples/ex1-app-exons.fasta \
     -s examples/analysis/ex1_snvs_indels.txt \
+    -f examples/analysis/ex1_fads.txt \
     -o examples/analysis/ex1_snvs_indels_circo.pdf
 
 

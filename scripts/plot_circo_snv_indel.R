@@ -17,10 +17,13 @@ option_list = list(
               help = 'Output from runs_snvs_indels_analysis.R'),
   make_option(c('-l', '--input-exon-lengths'),
               help = 'Input file with exon lengths. Generate in bash then import here.'),
-  make_option(c('-f', '--input-fads'),
+  make_option(c('-f', '--input-fads'), default = ' ',
               help = 'FAD variant matches, output from run_snvs_indels_analysis.R'),
   make_option(c('-o', '--output-circoplot'),
-              help = 'Output filename for the circo plot.')
+              help = 'Output filename for the circo plot.'),
+  make_option(c('--plot-abeta-region'),
+              default = 1,
+              help = 'Plot red frame / overlay around Abeta region.')
 )
 
 opt = parse_args(OptionParser(option_list=option_list))
@@ -29,7 +32,9 @@ opt = parse_args(OptionParser(option_list=option_list))
 blast_fixed = opt$`input-exon-table`
 snv_indel_fix = opt$`input-snvs-indels`
 exonlen = opt$`input-exon-lengths`
+fads = opt$`input-fads`
 output_circoplot = opt$`output-circoplot`
+plot_abeta = opt$`plot-abeta-region`
 
 ##-------------------- Analysis and plotting parameters -------------------------
 annotation = c('insertion', 'deletion', 'SNV', '-')
@@ -37,7 +42,10 @@ nts = c('A', 'C', 'G', 'T', '-')
 count_ivals = c(1,3,10,30,100,300)
 no_bins = 5
 count_colors = rev(brewer.pal(no_bins, 'RdYlBu'))
-
+link_colors = c(brewer.pal(12, 'Paired'), 'black')
+link_colors[11] = 'gray'
+# The number of link colors limits how many unique exon combinations we
+# can plot. If we have more uniques than colors, some will not be plotted.
 
 ##-------------------------- Load files -----------------------------------------
 cat('* Loading files')
@@ -48,7 +56,10 @@ cat('.')
 snv_indel_fix.dt = fread(snv_indel_fix)
 cat('.')
 blast_fixed.dt = fread(blast_fixed)
-cat('.')
+if (fads != ' ') {
+  var_match.dt = fread(fads)
+  cat('.')
+}
 cat(' OK.\n')
 
 # Calculate absolute exon coordinates
@@ -56,6 +67,12 @@ exon_coords.dt = exonlen.dt[order(exon_id)][!(exon_id %like% '_rc')]
 exon_coords.dt[, exon_start_abs := c(0, cumsum(exon_length)[1:(.N-1)])+1]
 exon_coords.dt[, exon_end_abs := exon_start_abs + exon_length - 1]
 exon_coords.dt[, exon_no := as.integer(gsub('_rc', '', gsub('exon_(.*).*','\\1', exon_id)))]
+
+if (fads != ' ') {
+  var_matches.dt = var_match.dt[,
+    .(count_unique=.N), by=.(exon_no, exon_abs_pos)]
+}
+
 
 #---------------------- Generate separate tables for plotting --------------------
 
@@ -305,19 +322,21 @@ for (i in c(0:3)) {
 }
 
 # Add annotated SNVs
-if (nrow(var_match.dt) > 0) {
-   circos.genomicTrackPlotRegion(
-      var_matches.dt[, .(exon_no, exon_abs_pos, exon_abs_pos2 = exon_abs_pos,
-                         log10(count_unique))],
-      track.index=3,
-      panel.fun = function (region, value, ...) {
-         circos.genomicPoints(region, value, ..., pch=21, cex=0.6,
-                              bg=count_colors[length(count_colors)],
-                              col=NA
-         )
-      },
-      ylim = c(0, 3)
-   )
+if (fads != ' ') {
+  if (nrow(var_match.dt) > 0) {
+     circos.genomicTrackPlotRegion(
+        var_matches.dt[, .(exon_no, exon_abs_pos, exon_abs_pos2 = exon_abs_pos,
+                           log10(count_unique))],
+        track.index=3,
+        panel.fun = function (region, value, ...) {
+           circos.genomicPoints(region, value, ..., pch=21, cex=0.6,
+                                bg=count_colors[length(count_colors)],
+                                col=NA
+           )
+        },
+        ylim = c(0, 3)
+     )
+  }
 }
 
 circos.genomicTrackPlotRegion(
@@ -400,7 +419,7 @@ exon_join_u_top.dt = exon_join_u.dt[, .SD[order(-join_count)],
 
 exon_join_u_top.dt = exon_join_u_top.dt[!(exon_comb_short_rc %like% '18,[0-9]+')]
 exon_join_u_top.dt = exon_join_u_top.dt[!(exon_comb_short_rc %like% ',1[,|-]')]
-# exon_comb_display = exon_join_u_top.dt[, unique(exon_comb_short_rc)]
+exon_comb_display = exon_join_u_top.dt[, unique(exon_comb_short_rc)]
 
 for (i in 1:length(link_colors)) {
    circos.genomicLink(
@@ -413,51 +432,54 @@ for (i in 1:length(link_colors)) {
 }
 
 # ------------- Add the annotation for APP beta sequence
-aa_prot_coords = c(672, 713)
-abeta_aa_seq = 'DAEFRHDSGYEVHHQKLVFFAEDVGSNKGAIIGLMVGGVVIA'
-e16 = paste0('GTTCTGGGTTGACAAATATCAAGACGGAGGAGATCTCTGAAGTGAAGATGGATGCAGAATT',
-             'CCGACATGACTCAGGATATGAAGTTCATCATCAAAAATTG')
-e17 = paste0('GTGTTCTTTGCAGAAGATGTGGGTTCAAACAAAGGTGCAATCATTGGACTCATGGTGGGCG',
-             'GTGTTGTCATAGCGACAGTGATCGTCATCACCTTGGTGATGCTGAAGAAGAAACAGTACAC',
-             'ATCCATTCATCATGGTGTGGTGGAG')
-abeta_coord = c(aa_prot_coords[1]*3 - 1 - exon_coords.dt[exon_no==16,
-                                                         exon_start_abs],
-                aa_prot_coords[2]*3 + 1 - exon_coords.dt[exon_no==17,
-                                                         exon_start_abs])
-abeta_dna_seq = paste0(
-   str_sub(e16, aa_prot_coords[1]*3 - 1 - exon_coords.dt[exon_no==16,
-                                                         exon_start_abs]),
-   str_sub(e17, 1, aa_prot_coords[2]*3 + 1 - exon_coords.dt[exon_no==17,
-                                                            exon_start_abs]))
-abeta_abs_coord = c(aa_prot_coords[1]*3 - 2, aa_prot_coords[2]*3)
-# draw.sector(start.degree = get.cell.meta.data("cell.start.degree",
-# sector.index='16') +
-#               get.cell.meta.data("cell.top.radius", track.index=2))
-circos.rect(xleft=abeta_abs_coord[1], xright=abeta_abs_coord[2],
-            # ybottom=-0.55,
-            ybottom = -12,
-            ytop=1.55, sector.index='16',
-            track.index=2,
-            col=alpha('red', 0.30),
-            #col=alpha('#ffffbf', 0.4),
-            border='red',
-            lwd=0.5, lty=1)
+if (plot_abeta == 1) {
+  aa_prot_coords = c(672, 713)
+  abeta_aa_seq = 'DAEFRHDSGYEVHHQKLVFFAEDVGSNKGAIIGLMVGGVVIA'
+  e16 = paste0('GTTCTGGGTTGACAAATATCAAGACGGAGGAGATCTCTGAAGTGAAGATGGATGCAGAATT',
+               'CCGACATGACTCAGGATATGAAGTTCATCATCAAAAATTG')
+  e17 = paste0('GTGTTCTTTGCAGAAGATGTGGGTTCAAACAAAGGTGCAATCATTGGACTCATGGTGGGCG',
+               'GTGTTGTCATAGCGACAGTGATCGTCATCACCTTGGTGATGCTGAAGAAGAAACAGTACAC',
+               'ATCCATTCATCATGGTGTGGTGGAG')
+  abeta_coord = c(aa_prot_coords[1]*3 - 1 - exon_coords.dt[exon_no==16,
+                                                           exon_start_abs],
+                  aa_prot_coords[2]*3 + 1 - exon_coords.dt[exon_no==17,
+                                                           exon_start_abs])
+  abeta_dna_seq = paste0(
+     str_sub(e16, aa_prot_coords[1]*3 - 1 - exon_coords.dt[exon_no==16,
+                                                           exon_start_abs]),
+     str_sub(e17, 1, aa_prot_coords[2]*3 + 1 - exon_coords.dt[exon_no==17,
+                                                              exon_start_abs]))
+  abeta_abs_coord = c(aa_prot_coords[1]*3 - 2, aa_prot_coords[2]*3)
+  # draw.sector(start.degree = get.cell.meta.data("cell.start.degree",
+  # sector.index='16') +
+  #               get.cell.meta.data("cell.top.radius", track.index=2))
+  circos.rect(xleft=abeta_abs_coord[1], xright=abeta_abs_coord[2],
+              # ybottom=-0.55,
+              ybottom = -12,
+              ytop=1.55, sector.index='16',
+              track.index=2,
+              col=alpha('red', 0.30),
+              #col=alpha('#ffffbf', 0.4),
+              border='red',
+              lwd=0.5, lty=1)
+  
+  # Add dashed line for abeta region inside SNV and indel tracks
+  # for (i in 1:2) {
+  #    circos.lines(track.index=3, x=c(abeta_abs_coord[i], abeta_abs_coord[i]),
+  #                 y=c(-0.5, 4), lty=5, lwd=0.7, sector.index='16')
+  #    circos.lines(track.index=4, x=c(abeta_abs_coord[i], abeta_abs_coord[i]),
+  #                 y=c(-0.3, 2.7), lty=5, lwd=0.7, sector.index='16')
+  #    circos.lines(track.index=5, x=c(abeta_abs_coord[i], abeta_abs_coord[i]),
+  #                 y=c(-0.3, 4.3), lty=5, lwd=0.7, sector.index='16')
+  # }
 
-# Add dashed line for abeta region inside SNV and indel tracks
-# for (i in 1:2) {
-#    circos.lines(track.index=3, x=c(abeta_abs_coord[i], abeta_abs_coord[i]),
-#                 y=c(-0.5, 4), lty=5, lwd=0.7, sector.index='16')
-#    circos.lines(track.index=4, x=c(abeta_abs_coord[i], abeta_abs_coord[i]),
-#                 y=c(-0.3, 2.7), lty=5, lwd=0.7, sector.index='16')
-#    circos.lines(track.index=5, x=c(abeta_abs_coord[i], abeta_abs_coord[i]),
-#                 y=c(-0.3, 4.3), lty=5, lwd=0.7, sector.index='16')
-# }
 
-
-circos.text(x=round(mean(abeta_abs_coord)), y=1,
-            labels=expression(paste('A', beta)),
-            col = 'red',
-            sector.index='17', track.index=1)
+  circos.text(x=round(mean(abeta_abs_coord)), y=1,
+              labels=expression(paste('A', beta)),
+              col = 'red',
+              sector.index='17', track.index=1)
+  
+}
 
 # ------------ Legend for total counts
 # Generate intervals from a vector
@@ -513,5 +535,4 @@ circos.text(x=exon_coords.dt[exon_id=='exon_09', round((exon_start_abs+exon_end_
             track.index=5, sector.index=9)
 
 # End prototyping circo plot
-dev.off()
 cat(' OK.\n')
