@@ -1,9 +1,7 @@
 #!/bin/bash
-#
-# Find and analyze SNVs and indels.
 
 echo ""
-echo "SNVs and indels analysis"
+echo "Reading frame analysis"
 echo ""
 
 # Get scripts directory; supports symlinks
@@ -26,38 +24,24 @@ if [[ $# -lt 2 && "$1" != "-h" && "$1" != "--help" ]]; then
   exit
 fi
 
-
 while [[ $# -gt 1 || "$1" == "-h" || "$1" == "--help" ]]
 do
   key="$1"
   case $key in
-    -i|--input-blast) # Input FASTA file with processed / qc'ed reads
-    input_blast_table="$2"
+    -i|--input-exon-table) # Input FASTA file with processed / qc'ed reads
+    input_exon_table="$2"
     shift # past argument
     ;;
-    -e|--input-exons-fasta) 
-    input_exons_fasta="$2"
+    -e|--input-exon-fasta)
+    input_exon_fasta="$2"
     shift
     ;;
-    -f|--input-fads) 
-    input_fads="$2"
+    -o|--output-contigs)
+    output_contigs="$2"
     shift
     ;;
-    -of|--output-fads)
-	  output_fads="$2"
-	  shift
-	  ;;
-	  -os|--output-snvs-indels)
-	  output_snvs_indels="$2"
-	  shift
-	  ;;
     --del-intermediate-files) # Delete all intermediate files?
     del_files="$2"
-    shift
-    ;;
-    -h|--help) # Show program usage
-    cat $DIR/manuals/${exe}.txt | more
-    exit
     shift
     ;;
     --default)
@@ -71,39 +55,24 @@ do
   shift # past argument or value
 done
 
-if [ -z "$input_fads" ]; then
-	input_fads=" "
-else
-  input_fads="--input-fads ${input_fads}"
-fi
-
-if [ -z "$output_fads" ]; then
-	output_fads=" "
-else
-  output_fads="--output-fads $output_fads"
-fi
-
 if [ -z "$del_files" ]; then
   del_files=1
 fi
 
-echo -n "* Generating exon lengths..."
-output_exon_lengths="${input_exons_fasta%.*}_exon_lengths.txt"
-$DIR/generate_exon_lengths $input_exons_fasta $output_exon_lengths
-echo " OK."
+# Generate exon lengths and exon orf offsets, then pass those files as
+# arguments to run_reading_frame_analysis.R
+output_exon_orfs="${input_exon_fasta%.*}_orfs.txt"
 
-Rscript --vanilla $DIR/run_snvs_indels_analysis.R \
-    --input-exon-table $input_blast_table \
-    --input-exon-lengths $output_exon_lengths \
-    $input_fads \
-    --output-snvs-indels $output_snvs_indels \
-    $output_fads
+$DIR/generate_reference_exon_orfs \
+  $input_exon_fasta $output_exon_orfs
+
+Rscript $DIR/run_reading_frame_analysis.R \
+  --input-exon-table $input_exon_table \
+  --input-exon-orfs  $output_exon_orfs \
+  --output-contigs $output_contigs
 
 if [[ "$del_files" -eq "1" ]]; then
   echo -n "* Deleting temporary files..."
-  rm $output_exon_lengths
+  rm $output_exon_orfs
   echo " OK."
 fi
-
-echo ""
-echo "Done."

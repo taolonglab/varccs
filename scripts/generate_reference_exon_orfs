@@ -40,10 +40,12 @@ BEGIN {
 			exon_start_pos = length(total_seq) + 1;
 			exon_orf_pos = exon_start_pos % 3;
 			if (exon_orf_pos == 0) {
+				exon_orf_pos = 2;
+			} else if (exon_orf_pos == 2) {
 				exon_orf_pos = 3;
-			}			
+			}
 		}
-		printf "%d\t%d\t%s\n", exon_no, exon_orf_pos, exon_start_pos;		
+		printf "%d\t%d\n", exon_no, exon_orf_pos;		
 		status = 1;
 	}
 	else if ($0 ~ /^>exon_[0-9]+_rc /) {

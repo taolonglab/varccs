@@ -53,5 +53,9 @@ scripts/snvs_indels_plot \
     -f examples/analysis/ex1_fads.txt \
     -o examples/analysis/ex1_snvs_indels_circo.pdf
 
-
+# Run reading frame analysis
+scripts/reading_frame_analysis \
+	-i examples/analysis/ex1_exon_table_hmpfix.txt \
+	-e examples/ex1-app-exons.fasta \
+	-o examples/analysis/ex1_reading_frame_contigs.txt
 ```

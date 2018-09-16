@@ -9,21 +9,27 @@ suppressPackageStartupMessages(library(circlize))
 suppressPackageStartupMessages(library(RColorBrewer))
 cat(' OK.\n')
 
-##----------------------- Parse input arguments ----------------------------------
+##----------------------- Parse input arguments --------------------------------
 option_list = list(
-  make_option(c('-i', '--input-exon-table'),
-              help = 'Output from blast_reads. *_exon_table or _exon_table_hmpfix.'),
-  make_option(c('-s', '--input-snvs-indels'),
-              help = 'Output from runs_snvs_indels_analysis.R'),
-  make_option(c('-l', '--input-exon-lengths'),
-              help = 'Input file with exon lengths. Generate in bash then import here.'),
-  make_option(c('-f', '--input-fads'), default = ' ',
-              help = 'FAD variant matches, output from run_snvs_indels_analysis.R'),
-  make_option(c('-o', '--output-circoplot'),
-              help = 'Output filename for the circo plot.'),
-  make_option(c('--plot-abeta-region'),
-              default = 1,
-              help = 'Plot red frame / overlay around Abeta region.')
+  make_option(
+    c('-i', '--input-exon-table'),
+    help = 'Output from blast_reads. *_exon_table or _exon_table_hmpfix.'),
+  make_option(
+    c('-s', '--input-snvs-indels'),
+    help = 'Output from runs_snvs_indels_analysis.R'),
+  make_option(
+    c('-l', '--input-exon-lengths'),
+    help = 'Input file with exon lengths. Generate in bash then import here.'),
+  make_option(
+    c('-f', '--input-fads'), default = ' ',
+    help = 'FAD variant matches, output from run_snvs_indels_analysis.R'),
+  make_option(
+    c('-o', '--output-circoplot'),
+    help = 'Output filename for the circo plot.'),
+  make_option(
+    c('--plot-abeta-region'),
+    default = 1,
+    help = 'Plot red frame / overlay around Abeta region.')
 )
 
 opt = parse_args(OptionParser(option_list=option_list))
@@ -36,7 +42,7 @@ fads = opt$`input-fads`
 output_circoplot = opt$`output-circoplot`
 plot_abeta = opt$`plot-abeta-region`
 
-##-------------------- Analysis and plotting parameters -------------------------
+##-------------------- Analysis and plotting parameters ------------------------
 annotation = c('insertion', 'deletion', 'SNV', '-')
 nts = c('A', 'C', 'G', 'T', '-')
 count_ivals = c(1,3,10,30,100,300)
@@ -47,7 +53,7 @@ link_colors[11] = 'gray'
 # The number of link colors limits how many unique exon combinations we
 # can plot. If we have more uniques than colors, some will not be plotted.
 
-##-------------------------- Load files -----------------------------------------
+##-------------------------- Load files ----------------------------------------
 cat('* Loading files')
 exonlen.dt = fread(exonlen)
 exonlen.dt[, exon_no := as.integer(
@@ -66,7 +72,8 @@ cat(' OK.\n')
 exon_coords.dt = exonlen.dt[order(exon_id)][!(exon_id %like% '_rc')]
 exon_coords.dt[, exon_start_abs := c(0, cumsum(exon_length)[1:(.N-1)])+1]
 exon_coords.dt[, exon_end_abs := exon_start_abs + exon_length - 1]
-exon_coords.dt[, exon_no := as.integer(gsub('_rc', '', gsub('exon_(.*).*','\\1', exon_id)))]
+exon_coords.dt[, exon_no := as.integer(
+  gsub('_rc', '', gsub('exon_(.*).*','\\1', exon_id)))]
 
 if (fads != ' ') {
   var_matches.dt = var_match.dt[,
@@ -74,7 +81,7 @@ if (fads != ' ') {
 }
 
 
-#---------------------- Generate separate tables for plotting --------------------
+#---------------------- Generate separate tables for plotting ------------------
 
 # SNVs
 # Let's manually generate a frequency table for each exon and for each exon
@@ -164,7 +171,8 @@ if (!('count_insertion' %in% names(snv_indel_ft_abs2.dt))) {
   snv_indel_ft_abs2.dt[, count_insertion := 0L]
 }
 
-snv_indel_ft_abs2.dt[, count_total := count_SNV + count_deletion + count_insertion]
+snv_indel_ft_abs2.dt[, count_total := count_SNV + count_deletion + 
+                       count_insertion]
 snv_indel_ft_abs2.dt[, count_total_log10 := log10(count_total)]
 count_range_log10 = snv_indel_ft_abs2.dt[, range(count_total_log10)]
 # count_range_log10[2] = count_range_log10[2] + 0.1
@@ -201,7 +209,8 @@ exon_joins.dt = blast_fixed.dt[, {
    joins = list()
    for (i in 2:.N) {
       if (!(exon_no[i] %in% c(exon_no[i-1]+1, exon_no[i-1]-1))) {
-         # This exon is not the prev +- 1. Therefore this is the intra-exon join.
+         # This exon is not the prev +- 1. 
+        # Therefore this is the intra-exon join.
          if (exon_id[i-1] %like% 'rc') {
             exon_l_rc = 1
             exon_l_pos = exon_length[i-1] - exon_end_pos_align[i-1] + 1L
@@ -261,7 +270,7 @@ cat(' OK.\n')
 
 
 cat('* Generating circo plot...')
-#--------------------------------- CIRCO PLOT -----------------------------------
+#--------------------------------- CIRCO PLOT ----------------------------------
 #
 # Required data tables:
 # exon_coords.dt (absolute coordinates for each exon)
@@ -287,7 +296,8 @@ circo_color = rev(brewer.pal(7, 'Blues')[1:3])
 circos.clear()
 circos.par("start.degree" = 82, "gap.degree" = c(rep(1, 17), 19),
             points.overflow.warning=F)
-circos.genomicInitialize(exon_coords.dt[, .(exon_no, exon_start_abs, exon_end_abs)],
+circos.genomicInitialize(exon_coords.dt[, .(exon_no, exon_start_abs, 
+                                            exon_end_abs)],
                          plotType = 'labels')
 circos.genomicTrackPlotRegion(
    ylim = c(0, 1),
@@ -349,7 +359,8 @@ circos.genomicTrackPlotRegion(
    ylim = c(0, 3)
 )
 
-circos.yaxis(at=c(0, 1, 2, 3), sector.index=1, track.index=3, labels.cex=y_lab_size,
+circos.yaxis(at=c(0, 1, 2, 3), sector.index=1, track.index=3, 
+             labels.cex=y_lab_size,
              labels = c('1', '10', '100', '1,000'),
              labels.niceFacing = F)
 
@@ -417,7 +428,8 @@ circos.yaxis(at = c(0:2), sector.index=1, track.index=5,
 exon_join_u_top.dt = exon_join_u.dt[, .SD[order(-join_count)],
                                     by=exon_comb_short_rc]
 
-exon_join_u_top.dt = exon_join_u_top.dt[!(exon_comb_short_rc %like% '18,[0-9]+')]
+exon_join_u_top.dt = exon_join_u_top.dt[!(exon_comb_short_rc %like% 
+                                            '18,[0-9]+')]
 exon_join_u_top.dt = exon_join_u_top.dt[!(exon_comb_short_rc %like% ',1[,|-]')]
 exon_comb_display = exon_join_u_top.dt[, unique(exon_comb_short_rc)]
 
@@ -490,7 +502,8 @@ make_intervals = function (v, min_sym='', max_sym='\u2265') {
    if (min_sym != '') {
       ivs_str = c(paste0('\u2264 ', ivs[[1]][1]))
    }
-   ivs_str = c(ivs_str, sapply(ivs, function (iv) paste0('[', iv[1], ' - ', iv[2], ']')))
+   ivs_str = c(ivs_str, sapply(ivs, function (iv) paste0('[', iv[1], ' - ', 
+                                                         iv[2], ']')))
    if (max_sym != '') {
       ivs_str = c(ivs_str, paste0('\u2265 ', ivs[[length(ivs)]][2]))
    }
@@ -508,14 +521,6 @@ legend(
    title.adj=0, adj=0)
 
 # ------------ Legend for exon combinations
-# legend(x=0.75, y=1.15, title='', legend=exon_comb_display[1:3],
-#        fill=alpha(link_colors[1:4], 0.9), y.intersp=0.8,
-#        cex=0.7, bty='n',
-#        xjust=1, yjust=1, title.adj=0, adj=0)
-# legend(x=1.11, y=1.15, title='', legend=exon_comb_display[4:length(exon_comb_display)],
-#        fill=alpha(link_colors[4:length(link_colors)], 0.9), y.intersp=0.8,
-#        cex=0.7, bty='n',
-#        xjust=1, yjust=1, title.adj=0, adj=0)
 legend(x=1.08, y=1.08, title='', legend=exon_comb_display,
        fill=alpha(link_colors, 0.9), y.intersp=0.8,
        cex=0.5, bty='n',
@@ -524,13 +529,16 @@ legend(x=1.08, y=1.08, title='', legend=exon_comb_display,
 
 # Add labels for inner tracks
 circ_font_size = 0.75
-circos.text(x=exon_coords.dt[exon_id=='exon_09', round((exon_start_abs+exon_end_abs)/2)],
+circos.text(x=exon_coords.dt[exon_id=='exon_09', 
+                             round((exon_start_abs+exon_end_abs)/2)],
             y=log10(30), labels='SNV', facing='downward', cex=circ_font_size,
             track.index=3, sector.index=9)
-circos.text(x=exon_coords.dt[exon_id=='exon_09', round((exon_start_abs+exon_end_abs)/2)],
+circos.text(x=exon_coords.dt[exon_id=='exon_09', 
+                             round((exon_start_abs+exon_end_abs)/2)],
             y=log10(10), labels='ins', facing='downward', cex=circ_font_size,
             track.index=4, sector.index=9)
-circos.text(x=exon_coords.dt[exon_id=='exon_09', round((exon_start_abs+exon_end_abs)/2)],
+circos.text(x=exon_coords.dt[exon_id=='exon_09', 
+                             round((exon_start_abs+exon_end_abs)/2)],
             y=log10(10), labels='del', facing='downward', cex=circ_font_size,
             track.index=5, sector.index=9)
 
