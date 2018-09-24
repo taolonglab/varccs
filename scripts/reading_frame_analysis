@@ -44,6 +44,11 @@ do
     del_files="$2"
     shift
     ;;
+    -h|--help) # Show program usage
+    cat $DIR/manuals/${exe}.txt | more
+    exit
+    shift
+    ;;    
     --default)
     DEFAULT=YES
     ;;

@@ -27,7 +27,32 @@ want to analyze them (not required).
 ```sh
 scripts/fastq_qc_to_fasta \
 	-i examples/ex1.fastq -m examples/ex1-primers.fasta -p examples/analysis/ex1
+```
 
+FASTQ Quality Control to FASTA
+
+Jobs to do:
+* average quality score filter: ON (min qscore: 85)
+* homopolymer run filter: ON (qscore threshold: 30, num. repeats: 2+)
+* PCR primer alignment filter: ON (BLAST word size: auto)
+
+Executing jobs:
+* average quality filter... OK.
+* homopolymer run filter... OK.
+* PCR primer alignment filter...
+  ? word size automatically set to 3/4 of the shortest primer length.
+  - BLAST word size: 13, gap open: 0, gap extend: 2, max offset: 150 nt
+  - total reads in the read file: 257. file format: FASTA
+  - processed   256 out of   257 reads (skipped:   45,   45 missing > 1 primer,  113 rev. complemented,  0 wrong dir).
+  - total run time: 0 m 9 s
+  OK.
+* finding unique reads (adding up counts)...  OK.
+  -> examples/analysis/ex1_filtered_qs85_hpf_qs30_rep2_unique_primerblasted_wsauto_unique.fasta
+* deleting temporary files...... OK.
+
+Done.
+
+```sh
 # Blast reads vs reference exons
 scripts/blast_reads \
     -i examples/analysis/ex1_filtered_qs85_hpf_qs30_rep2_unique_primerblasted_wsauto_unique.fasta \

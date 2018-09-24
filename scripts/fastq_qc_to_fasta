@@ -64,6 +64,10 @@ do
       qs_hth="$2"
       shift
       ;;
+      -qs_sym|--qs_sum) # Symbol for homopolymer run
+      qs_sym="$2"
+      shift
+      ;;
       -run_hth|--run_hth) # Minimum run length for homopolymer run filter
       run_hth="$2"
       shift
@@ -149,6 +153,9 @@ if [ "$j_homo" -eq "1" ]; then
   if [ -z "$run_hth" ]; then
     run_hth=2
   fi
+  if [ -z "$qs_sym" ]; then
+    qs_sym="N"
+  fi
   echo "(qscore threshold: $qs_hth, num. repeats: ${run_hth}+)"
 else
   echo "OFF"
@@ -192,7 +199,7 @@ if [ "$j_homo" -eq "1" ]; then
   out_qc2="${out_qc1}_hpf_qs${qs_hth}_rep${run_hth}"
   echo -n "* homopolymer run filter... "
   $DIR/fastq_homopolymer_filter.py "${out_qc1}.fastq" "$qs_hth" "$run_hth" \
-    "${out_qc2}.fastq" "${out_qc2}_homopolymer_qs.txt"
+    "${out_qc2}.fastq" "${out_qc2}_homopolymer_qs.txt" "$qs_sym"
   echo "OK."
 else
   echo "* SKIP: homopolymer run filter"

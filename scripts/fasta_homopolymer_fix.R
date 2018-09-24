@@ -7,12 +7,10 @@
 
 # Load required libraries
 suppressPackageStartupMessages(library(data.table))
-# suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(stringr))
 suppressPackageStartupMessages(library(optparse))
 suppressPackageStartupMessages(library(Biostrings))
 
-# setwd('/Users/igor/cloud/research/app')
 options(warn = -1)
 
 # Argument defaults

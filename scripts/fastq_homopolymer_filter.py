@@ -90,6 +90,6 @@ if __name__ == '__main__':
     output_st = sys.argv[5]
 
 
-    main(input_fq, output_st, output_fq, rep=int(input_rl), qs_threshold=int(input_qs))
+    main(input_fq, output_st, output_fq, rep=int(input_rl), qs_threshold=int(input_qs), run_letter=str(sys.argv[6]))
     # if verbose:
     #     print('Done.')
