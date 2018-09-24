@@ -29,7 +29,7 @@ scripts/fastq_qc_to_fasta \
 	-i examples/ex1.fastq -m examples/ex1-primers.fasta -p examples/analysis/ex1
 ```
 
-FASTQ Quality Control to FASTA
+    FASTQ Quality Control to FASTA
 
 Jobs to do:
 * average quality score filter: ON (min qscore: 85)
