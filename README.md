@@ -16,7 +16,11 @@ Required packages for Python: .
 
 ## Example
 
-To start we need several files:
+In this example we will analyze DNA sequences obtained from prefrontal cortex neuron DNA, using PCR to amplify any sequences that share the beginning and the end with the coding sequence of an Amyloid Precursor Protein (APP).
+
+These amplified sequences were sequenced using PacBio SMRT platform and the raw BAM were converted to Circular Consensus (CCS) FASTQ files using a CCS2 algorithm in the SMRTLink version 4.0.
+
+To start, we need several files:
 
 1. Input CCS FASTQ sequences; here `examples/ex1.fastq`.
 2. Reference exon sequences; here `examples/ex1-primers.fasta` [(tutorial how to
@@ -25,11 +29,12 @@ prepare this file)](prepare_reference_exons.md)
 want to analyze them (not required).
 
 ```sh
+# Quality Control 
 scripts/fastq_qc_to_fasta \
 	-i examples/ex1.fastq -m examples/ex1-primers.fasta -p examples/analysis/ex1
 ```
-
-    FASTQ Quality Control to FASTA
+```
+FASTQ Quality Control to FASTA
 
 Jobs to do:
 * average quality score filter: ON (min qscore: 85)
@@ -51,6 +56,7 @@ Executing jobs:
 * deleting temporary files...... OK.
 
 Done.
+```
 
 ```sh
 # Blast reads vs reference exons
@@ -58,18 +64,75 @@ scripts/blast_reads \
     -i examples/analysis/ex1_filtered_qs85_hpf_qs30_rep2_unique_primerblasted_wsauto_unique.fasta \
     -e examples/ex1-app-exons.fasta \
     --prefix examples/analysis/ex1
+```
+```
+BLAST Quality Controlled reads to Reference Exons
 
+* calculating read lengths... OK.
+* blast reads vs ref. exons
+  - word size: 25, gap open: 0, gap extend: 2
+  - processed   175 out of   175 reads
+  - total run time: 0 m 7 s
+* calculating reference exon lengths... OK.
+* BLAST results analysis
+  - loading and processing data...OK.
+  - generating various plots...OK.
+  - calculating exon statistics...OK.
+  - writing exon combinations... OK.
+    -> examples/analysis/ex1_exon_combinations_summary.txt
+  - writing final table... OK.
+* Fixing low quality homopolymer runs
+  - loading BLAST file... OK.
+  - loading FASTA file... OK.
+  - correcting reads... OK.
+  - saving output FASTA... OK.
+    -> examples/analysis/ex1_filtered_qs85_hpf_qs30_rep2_unique_primerblasted_wsauto_unique_hmpfix.fasta
+  - saving output homopolymer fixed table... OK.
+    -> examples/analysis/ex1_exon_table_hmpfix.txt
+* deleting temporary files..... OK.
+
+Done.
+```
+
+```sh
 # Create a table with exon-exon join information
-# I don't think this is even used in the followup analysis.
 Rscript scripts/exon_joins.R \
     -i examples/analysis/ex1_exon_table_hmpfix.txt \
     -o examples/analysis/ex1_exon-exon_joins.txt
+```
 
+```
+Exon-exon join analysis
+* Loading and processing data... OK.
+  - using homopolymer corrected sequences
+* Finding and organizing all exon-exon joins... OK.
+* saving exon-joins table... OK.
+  -> examples/analysis/ex1_exon-exon_joins.txt
+```
+
+```sh
+# Run SNV/indel analysis
 scripts/snvs_indels_analysis \
     -i examples/analysis/ex1_exon_table_hmpfix.txt \
     -e examples/ex1-app-exons.fasta \
     -os examples/analysis/ex1_snvs_indels.txt \
+```
 
+```
+SNVs and indels analysis
+
+* Generating exon lengths... OK.
+* Initializing R libraries... OK.
+* Loading input files.. OK.
+* Searching for SNVs and indels... OK.
+* Saving SNV/indel table... OK.
+  -> examples/analysis/ex1_snvs_indels.txt
+* Deleting temporary files... OK.
+
+Done.
+```
+
+```
 # Circo plot 1: SNVs, indels and intra-exon joins
 scripts/snvs_indels_plot \
     -i examples/analysis/ex1_exon_table_hmpfix.txt \
