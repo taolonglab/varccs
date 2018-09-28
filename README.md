@@ -1,8 +1,8 @@
-# pacbio
+# VarCCS: Variant Calling Tool for Circular Consensus Sequencing
 
 To do:
 
-Removed 1 or 2 hardcoded places in blast_reads referening to exons 1 and 18.
+Removed 1 or 2 hardcoded places in blast_reads referening to first and last exons.
 Automatically figure out first and the last from the exon reference
 FASTA file.
 
@@ -57,6 +57,8 @@ Executing jobs:
 
 Done.
 ```
+
+In this pipeline, the output files are indicated with `->` symbol in the script outputs.
 
 ```sh
 # Blast reads vs reference exons
