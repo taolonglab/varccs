@@ -65,6 +65,7 @@ if (input_fads != ' ') {
       ad_var.dt = fread(input_fads)
       cat('.')
    } else {
+      cat('\n')
       stop('! ERROR: Output filename for any found FADs is not given.')
    }
 }

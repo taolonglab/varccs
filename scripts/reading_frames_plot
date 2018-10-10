@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# Plot analyzed SNVs and indels.
+# Plot reading frames.
 
 echo ""
-echo "SNVs and indels plots"
+echo "Reading frame circo plot"
 echo ""
 
 # Get scripts directory; supports symlinks
@@ -31,36 +31,26 @@ while [[ $# -gt 1 || "$1" == "-h" || "$1" == "--help" ]]
 do
   key="$1"
   case $key in
-    -i|--input) # Input FASTA file with processed / qc'ed reads
-    input_blast_table="$2"
+    -i|--input-contigs) 
+    # Input table with reading frame contigs
+    # output from the `reading_frame_analysis` script.
+    input_contig_table="$2"
     shift # past argument
     ;;
-    -s|--input-snvs-indels) 
-    input_snvs_indels="$2"
+    -e|--input-exons) 
+    input_exons="$2"
     shift
     ;;
     -e|--input-exons-fasta) 
     input_exons_fasta="$2"
     shift
     ;;
-    -f|--input-fads)
-	input_fads="$2"
-	shift
-	;;
     -o|--output-circoplot)
 	output_circo="$2"
 	shift
 	;;
-	--plot-abeta-region)
-    plot_abeta="$2"
-    shift
-    ;;
-    --del-intermediate-files) # Delete all intermediate files?
-    del_files="$2"
-    shift
-    ;;
     -h|--help) # Show program usage
-    cat $DIR/manuals/${exe}.txt | more
+    cat $DIR/manuals/${exe}_plot.txt | more
     exit
     shift
     ;;
@@ -68,7 +58,7 @@ do
     DEFAULT=YES
     ;;
     *)
-    echo "$exe: unknown argument $key"
+    echo "blast_reads: unknown argument $key"
     # unknown option
     ;;
   esac
@@ -88,25 +78,4 @@ else
   input_fads="--input-fads ${input_fads}"
 fi
 
-echo -n "* Generating exon lengths..."
-output_exon_lengths="${input_exons_fasta%.*}_exon_lengths.txt"
-$DIR/generate_exon_lengths $input_exons_fasta $output_exon_lengths
-echo " OK."
 
-Rscript --vanilla $DIR/plot_circo_snv_indel.R \
-    --input-exon-table $input_blast_table \
-    --input-snvs-indels $input_snvs_indels \
-    $input_fads \
-    --input-exon-lengths $output_exon_lengths \
-    --output-circoplot $output_circo \
-    --plot-abeta-region $plot_abeta
-
-
-if [[ "$del_files" -eq "1" ]]; then
-  echo -n "* Deleting temporary files..."
-  rm $output_exon_lengths
-  echo " OK."
-fi
-
-echo ""
-echo "Done."

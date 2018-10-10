@@ -106,19 +106,19 @@ blast.dt[, read_length := .SD[.N, read_end_pos_align] -
 # Now recalculate the read coordinates for the reverse complemented reads
 # rc_reads = blast.dt[, if (.SD[1, exon_id] == 'exon_18_rc') .SD[1,],
 #                     by=read_id][, read_id]
-blast.dt[!(read_id %in% rc_reads), exon_seq_corrected := exon_seq]
-blast.dt[read_id %in% rc_reads,
-         c('read_start_pos_align', 'read_end_pos_align', 
-           'read_seq_corrected',
-           'exon_start_pos_align', 'exon_end_pos_align',
-           'exon_seq_corrected') := list(
-            read_length - read_end_pos_align + 1L,
-            read_length - read_start_pos_align + 1L,
-            reverse(chartr('ACGT', 'TGCA', read_seq_corrected)),
-            exon_length - exon_end_pos_align + 1L,
-            exon_length - exon_start_pos_align + 1L,
-            reverse(chartr('ACGT', 'TGCA', exon_seq))
-            ), by=read_id]
+# blast.dt[!(read_id %in% rc_reads), exon_seq_corrected := exon_seq]
+# blast.dt[read_id %in% rc_reads,
+#          c('read_start_pos_align', 'read_end_pos_align', 
+#            'read_seq_corrected',
+#            'exon_start_pos_align', 'exon_end_pos_align',
+#            'exon_seq_corrected') := list(
+#             read_length - read_end_pos_align + 1L,
+#             read_length - read_start_pos_align + 1L,
+#             reverse(chartr('ACGT', 'TGCA', read_seq_corrected)),
+#             exon_length - exon_end_pos_align + 1L,
+#             exon_length - exon_start_pos_align + 1L,
+#             reverse(chartr('ACGT', 'TGCA', exon_seq))
+#             ), by=read_id]
 blast.dt = blast.dt[order(read_id, read_start_pos_align)]
 cat('OK.\n')
 

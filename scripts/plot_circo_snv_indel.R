@@ -28,7 +28,7 @@ option_list = list(
     help = 'Output filename for the circo plot.'),
   make_option(
     c('--plot-abeta-region'),
-    default = 1,
+    default = 0,
     help = 'Plot red frame / overlay around Abeta region.')
 )
 
@@ -41,6 +41,9 @@ exonlen = opt$`input-exon-lengths`
 fads = opt$`input-fads`
 output_circoplot = opt$`output-circoplot`
 plot_abeta = opt$`plot-abeta-region`
+legend_text_scale = 0.85
+circ_font_size = 0.75
+
 
 ##-------------------- Analysis and plotting parameters ------------------------
 annotation = c('insertion', 'deletion', 'SNV', '-')
@@ -514,21 +517,22 @@ count_ivals_str = make_intervals(c(0, count_ivals[2:(length(count_ivals)-1)]))
 
 legend(
    # x=1.08, y=-1.1,
-   x=-1, y=1.1,
-   inset=0, title="total count", yjust=1, xjust=0,
+   x=-1.1, y=-0.65,
+   inset=0, title="  total count", yjust=1, xjust=0,
    legend=count_ivals_str,
-   fill=count_colors, horiz=F, cex=0.7, y.intersp=0.8, bty='n',
+   fill=count_colors, horiz=F, cex=legend_text_scale, 
+   y.intersp=0.8, bty='n',
    title.adj=0, adj=0)
 
 # ------------ Legend for exon combinations
-legend(x=1.08, y=1.08, title='', legend=exon_comb_display,
+legend(x=1.115, y=-0.5, title='', 
+       legend=sub('.*([0-9]+),([0-9]+).*', '\\1/\\2', exon_comb_display),
        fill=alpha(link_colors, 0.9), y.intersp=0.8,
-       cex=0.5, bty='n',
+       cex=legend_text_scale, bty='n',
        xjust=1, yjust=1, title.adj=0, adj=0)
 
 
 # Add labels for inner tracks
-circ_font_size = 0.75
 circos.text(x=exon_coords.dt[exon_id=='exon_09', 
                              round((exon_start_abs+exon_end_abs)/2)],
             y=log10(30), labels='SNV', facing='downward', cex=circ_font_size,
@@ -543,4 +547,5 @@ circos.text(x=exon_coords.dt[exon_id=='exon_09',
             track.index=5, sector.index=9)
 
 # End prototyping circo plot
+cat(' -->', output_circoplot, '\n')
 cat(' OK.\n')

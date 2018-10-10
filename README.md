@@ -49,7 +49,7 @@ Executing jobs:
   - BLAST word size: 13, gap open: 0, gap extend: 2, max offset: 150 nt
   - total reads in the read file: 257. file format: FASTA
   - processed   256 out of   257 reads (skipped:   45,   45 missing > 1 primer,  113 rev. complemented,  0 wrong dir).
-  - total run time: 0 m 9 s
+  - total run time: 0 m 10 s
   OK.
 * finding unique reads (adding up counts)...  OK.
   -> examples/analysis/ex1_filtered_qs85_hpf_qs30_rep2_unique_primerblasted_wsauto_unique.fasta
@@ -66,6 +66,7 @@ scripts/blast_reads \
     -i examples/analysis/ex1_filtered_qs85_hpf_qs30_rep2_unique_primerblasted_wsauto_unique.fasta \
     -e examples/ex1-app-exons.fasta \
     --prefix examples/analysis/ex1
+
 ```
 ```
 BLAST Quality Controlled reads to Reference Exons
@@ -74,7 +75,7 @@ BLAST Quality Controlled reads to Reference Exons
 * blast reads vs ref. exons
   - word size: 25, gap open: 0, gap extend: 2
   - processed   175 out of   175 reads
-  - total run time: 0 m 7 s
+  - total run time: 0 m 8 s
 * calculating reference exon lengths... OK.
 * BLAST results analysis
   - loading and processing data...OK.
@@ -88,7 +89,7 @@ BLAST Quality Controlled reads to Reference Exons
   - loading FASTA file... OK.
   - correcting reads... OK.
   - saving output FASTA... OK.
-    -> examples/analysis/ex1_filtered_qs85_hpf_qs30_rep2_unique_primerblasted_wsauto_unique_hmpfix.fasta
+    -> examples/analysis/ex1_hmpfix.fasta
   - saving output homopolymer fixed table... OK.
     -> examples/analysis/ex1_exon_table_hmpfix.txt
 * deleting temporary files..... OK.
@@ -117,7 +118,9 @@ Exon-exon join analysis
 scripts/snvs_indels_analysis \
     -i examples/analysis/ex1_exon_table_hmpfix.txt \
     -e examples/ex1-app-exons.fasta \
+    -f examples/ex1-app-fads.txt \
     -os examples/analysis/ex1_snvs_indels.txt \
+    -of examples/analysis/ex1_fads.txt
 ```
 
 ```
@@ -125,10 +128,13 @@ SNVs and indels analysis
 
 * Generating exon lengths... OK.
 * Initializing R libraries... OK.
-* Loading input files.. OK.
+* Loading input files..examples/ex1-app-fads.txt. OK.
 * Searching for SNVs and indels... OK.
 * Saving SNV/indel table... OK.
   -> examples/analysis/ex1_snvs_indels.txt
+* Analyzing data for Familial AD mutations... OK.
+* Saving identified known variants... OK.
+  -> examples/analysis/ex1_fads.txt
 * Deleting temporary files... OK.
 
 Done.
@@ -140,12 +146,48 @@ scripts/snvs_indels_plot \
     -i examples/analysis/ex1_exon_table_hmpfix.txt \
     -e examples/ex1-app-exons.fasta \
     -s examples/analysis/ex1_snvs_indels.txt \
-    -f examples/analysis/ex1_fads.txt \
     -o examples/analysis/ex1_snvs_indels_circo.pdf
+```
 
+```
+SNVs and indels plots
+
+* Generating exon lengths... OK.
+* Loading R libraries... OK.
+* Loading files.. OK.
+* Combining SNVs and indels into a single table... OK.
+* Finding all intra-exon joins... OK.
+* Generating circo plot... OK.
+* Deleting temporary files... OK.
+```
+
+```
 # Run reading frame analysis
 scripts/reading_frame_analysis \
 	-i examples/analysis/ex1_exon_table_hmpfix.txt \
 	-e examples/ex1-app-exons.fasta \
 	-o examples/analysis/ex1_reading_frame_contigs.txt
+```
+
+```
+Reading frame analysis
+
+* Loading fixed BLAST results... OK.
+* Loading exon ORF information...OK.
+* Filtering out possible PCR chimeras...OK.
+* Calculating positions for reverse-complemented reads...OK.
+* Generating table of reading frame contiguous segments...OK.
+* Savint output table... OK.
+  -> examples/analysis/ex1_reading_frame_contigs.txt
+* Deleting temporary files... OK.
+```
+
+```
+# Plot circo reading frames and exon composition
+Rscript scripts/plot_circo_reading_frames.R \
+  --input-contigs examples/analysis/ex1_reading_frame_contigs.txt \
+  --input-exons examples/analysis/ex1_exon_table_hmpfix.txt \
+  --input-fasta examples/analysis/ex1_hmpfix.fasta \
+  --output-circoplot examples/anaylsis/ex1_reading_frames_circo.pdf
+
 ```

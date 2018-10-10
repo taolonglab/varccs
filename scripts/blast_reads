@@ -165,7 +165,7 @@ Rscript $DIR/blast_results_to_exon_table.R \
   --output $out_exontable --output_sum $out_exonsum || true
 
 # Generate output filenams for homopolymer fixing script
-out_fasta="${input_file%.*}_hmpfix.fasta"
+out_fasta="${prefix}_hmpfix.fasta"
 out_table="${out_exontable%.*}_hmpfix.txt"
 
 if [ "$hmpfix" -eq "1" ]; then
